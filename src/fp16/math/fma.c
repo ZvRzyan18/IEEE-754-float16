@@ -6,7 +6,7 @@
 #define RETURN_NAN 3
 
 /*
- multiplication without loosing full precision
+ bit by bit multiplication without loosing full precision
 */
 static inline int multiply(uint16_t a, uint16_t b, uint16_t *out_sign, uint16_t *out_exponent, uint32_t *out_mantissa, uint16_t *product) {
 	uint16_t a_bits, b_bits, sign;
@@ -58,12 +58,12 @@ static inline int multiply(uint16_t a, uint16_t b, uint16_t *out_sign, uint16_t 
  
  mantissa = (uint32_t)a_mantissa * (uint32_t)b_mantissa;
  
- //unrounded value
+ //calculated value
  *out_sign = (0x8000 & a) ^ (0x8000 & b);
  *out_exponent = exponent+15;
  *out_mantissa = mantissa;
 
- if((*out_mantissa) >= (1 << 21)) {
+ while((*out_mantissa) >= (1 << 21)) {
 		(*out_mantissa) >>= 1;
 		(*out_exponent)++;
  }
@@ -80,9 +80,9 @@ static inline int multiply(uint16_t a, uint16_t b, uint16_t *out_sign, uint16_t 
  }
 }
 
- //rounded value
+ //estimated value
 	mantissa >>= 10;
- if(mantissa >= (1 << 11)) {
+ while(mantissa >= (1 << 11)) {
 		mantissa >>= 1;
 		exponent++;
  }
