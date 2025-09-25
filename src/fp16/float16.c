@@ -371,7 +371,7 @@ uint16_t fp16_mul(uint16_t a, uint16_t b) {
 	mantissa >>= 10;
 	
  //normalize
- if(mantissa >= (1 << 11)) {
+ while(mantissa >= (1 << 11)) {
 		mantissa >>= 1;
 		exponent++;
  }
