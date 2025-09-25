@@ -18,11 +18,10 @@ static const uint32_t c[8] = {
 };
 
 
-uint16_t fp16_sin(uint16_t x) {
-	uint16_t sign;
-	uint32_t mx, q, x2, x3, poly;
+uint16_t fp16_tan(uint16_t x) {
+	uint32_t mx, q, x2, x3, poly, sign, _sin, _cos;
 	
-	sign = x & 0x8000;
+	sign = (uint32_t)(x & 0x8000) << 16;
 	x &= 0x7FFF;
 	if(x >= 0x7C00)
 	 return 0x7C01; //nan
@@ -36,8 +35,20 @@ uint16_t fp16_sin(uint16_t x) {
 	x2 =    fp32_mul(mx, mx);
 	x3 =    fp32_mul(x2, mx);
  poly =  fp32_add(fp32_mul(fp32_add(fp32_mul(fp32_add(fp32_mul(c[0], x2), c[1]), x2), c[2]), x2), c[3]);
-	mx =    fp32_add(mx, fp32_mul(x3, poly));
-	return __fp32_tofloat16(mx) | sign;
+	_sin =  fp32_add(mx, fp32_mul(x3, poly)) | sign;
+
+ mx =    __fp32_tofloat32(x);
+	mx =    fp32_sub(mx, fp32_mul(fp32_trunc(fp32_mul(c[4], mx)), c[5]));
+ q =     (uint32_t)fp32_floattolong(fp32_mul(mx, c[6]));
+	mx =    fp32_sub(mx, fp32_mul(c[7], fp32_longtofloat32((int64_t)q) ));
+	sign    = (q == 1 || q == 2) << 31;
+	mx =    (q == 0 || q == 2) ? fp32_sub(c[7], mx) : mx;
+	x2 =    fp32_mul(mx, mx);
+	x3 =    fp32_mul(x2, mx);
+ poly =  fp32_add(fp32_mul(fp32_add(fp32_mul(fp32_add(fp32_mul(c[0], x2), c[1]), x2), c[2]), x2), c[3]);
+	_cos =  fp32_add(mx, fp32_mul(x3, poly)) | sign;
+
+ return __fp32_tofloat16(fp32_div(_sin, _cos));
 }
 
 

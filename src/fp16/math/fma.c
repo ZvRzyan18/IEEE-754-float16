@@ -6,7 +6,7 @@
 #define RETURN_NAN 3
 
 /*
- multiplication without rounding
+ multiplication without loosing full precision
 */
 static inline int multiply(uint16_t a, uint16_t b, uint16_t *out_sign, uint16_t *out_exponent, uint32_t *out_mantissa, uint16_t *product) {
 	uint16_t a_bits, b_bits, sign;
@@ -68,10 +68,10 @@ static inline int multiply(uint16_t a, uint16_t b, uint16_t *out_sign, uint16_t 
 		(*out_exponent)++;
  }
  
-if(exponent < -15) {
- (*out_mantissa) |= 1 << 20;
- int shift = -14 - exponent;
- if (shift > 10 && !(shift < 0)) {
+ if(exponent < -14) {
+  (*out_mantissa) |= 1 << 20;
+  int shift = -14 - exponent;
+  if (shift > 10 && !(shift < 0)) {
   //undeflow
   return RETURN_NAN;
  } else {
@@ -91,7 +91,7 @@ if(exponent < -15) {
  if(exponent > 15) {//overflow
   return RETURN_NAN;
  }
- if(exponent < -15) {
+ if(exponent < -14) {
 
   mantissa |= 1 << 10;
   int shift = -14 - exponent;
@@ -102,9 +102,7 @@ if(exponent < -15) {
    mantissa >>= shift;
    *product = sign | (mantissa & 0x03FF);
   }
- 
  }
-
 
  return 0;
 }
@@ -138,11 +136,11 @@ static inline uint16_t unsigned_add_bit(uint16_t exponent, uint32_t mantissa, ui
  final_mantissa = (a_mantissa + (b_mantissa << 10)) >> 10;
 
  //normalize
- if(final_mantissa >= (1 << 11)) {
+ while(final_mantissa >= (1 << 11)) {
 	 final_mantissa >>= 1;
 		final_exponent++;
  }
-
+ 
  out_bits = 0;
  out_bits |= ((final_exponent + 15) <<  10) | (final_mantissa & 0x03FF);
  return out_bits;
@@ -224,7 +222,7 @@ static inline uint16_t unsigned_sub_bit_b(uint16_t a, uint16_t exponent, uint32_
 
 
 /*
- addition with rounding
+ addition with full precision
 */
 static inline uint16_t add(uint16_t sign, uint16_t exponent, uint32_t mantissa, uint16_t product, uint16_t b) {
  uint16_t a_sign = sign;
@@ -250,9 +248,8 @@ static inline uint16_t add(uint16_t sign, uint16_t exponent, uint32_t mantissa, 
 }
 
 
-
 uint16_t fp16_fma(uint16_t x, uint16_t y, uint16_t z) {
- 
+
  uint16_t sign, exponent, product;
  uint32_t mantissa;
  
@@ -262,6 +259,7 @@ uint16_t fp16_fma(uint16_t x, uint16_t y, uint16_t z) {
  
  int error = multiply(x, y, &sign, &exponent, &mantissa, &product);
  
+ //handle cases
  switch(error) {
  	case RETURN_ZERO:
  	 return z;
@@ -275,5 +273,6 @@ uint16_t fp16_fma(uint16_t x, uint16_t y, uint16_t z) {
  }
  
  return add(sign, exponent, mantissa, product, z);
+
 }
 
