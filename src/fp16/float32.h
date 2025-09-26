@@ -68,7 +68,7 @@ static inline uint16_t __fp32_tofloat16(uint32_t x) {
  } else if(exp32 < 113) {
   //subnormal
   if(exp32 < 103) {
-   // too small for subnormal
+   // too small for subnormal, round to zero
    return 0;
   } else {
    uint32_t mant = mant32 | 0x800000;

@@ -13,6 +13,7 @@ extern "C" {
 
 uint16_t fp16_tofloat16(float x);
 float fp16_tofloat32(uint16_t x);
+uint16_t fp16_longtofloat16(int64_t x);
 
 /*
  compare operator
@@ -32,16 +33,10 @@ uint16_t fp16_sub(uint16_t a, uint16_t b);
 uint16_t fp16_mul(uint16_t a, uint16_t b);
 uint16_t fp16_div(uint16_t a, uint16_t b);
 
-/*
- to integer
-*/
-int fp16_toint32(uint16_t x);
-
 #ifdef __cplusplus
 }
 #endif
 
 #endif
-
 
 

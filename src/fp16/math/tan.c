@@ -17,13 +17,17 @@ static const uint32_t c[8] = {
 	0x3fc90fdb, //pio2
 };
 
-
+/*
+ tan(x) = sin(x)/cos(x)
+*/
 uint16_t fp16_tan(uint16_t x) {
 	uint32_t mx, q, x2, x3, poly, sign, _sin, _cos;
 	
+	//sign handle
 	sign = (uint32_t)(x & 0x8000) << 16;
 	x &= 0x7FFF;
-	if(x >= 0x7C00)
+	
+	if(x >= 0x7C00) //inf, nan
 	 return 0x7C01; //nan
 	
  mx =    __fp32_tofloat32(x);
