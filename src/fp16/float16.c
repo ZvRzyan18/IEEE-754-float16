@@ -20,6 +20,7 @@ typedef union {
 uint16_t fp16_tofloat16(float x) {
  __fp32_bits bits;
  bits.f = x;
+ //for implementation of __fp32_tofloat16 see @float32.h 
  return __fp32_tofloat16(bits.i);
 }
 
@@ -27,13 +28,14 @@ uint16_t fp16_tofloat16(float x) {
 
 float fp16_tofloat32(uint16_t x) {
  __fp32_bits bits;
+ //for implementation of __fp32_tofloat32 see @float32.h 
  bits.i = __fp32_tofloat32(x);
  return bits.f;
 }
 
 
 
-uint16_t fp16_longtofloat16(long x) {
+uint16_t fp16_longtofloat16(int64_t x) {
  uint16_t sign, input, exponent, mantissa;
  int16_t msb;
  
