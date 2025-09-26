@@ -1,6 +1,9 @@
 #include "fp16/math.h"
 #include "fp16/float16.h"
 
+/*
+ round to zero
+*/
 uint16_t fp16_trunc(uint16_t x) {
  uint16_t x_bits, out_bits, sign, mantissa;
 

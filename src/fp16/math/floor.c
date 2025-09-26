@@ -1,6 +1,9 @@
 #include "fp16/math.h"
 #include "fp16/float16.h"
 
+/*
+ round to negative infinity
+*/
 uint16_t fp16_floor(uint16_t x) {
 	uint16_t x_bits, out_bits, sign, mantissa, mask;
   	

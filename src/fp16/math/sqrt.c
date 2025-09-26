@@ -1,7 +1,11 @@
 #include "fp16/math.h"
 #include "fp16/float16.h"
 
-
+/*
+ square root
+ 
+ sqrt(x) = x ^ 1/2
+*/
 uint16_t fp16_sqrt(uint16_t x) {
  //Quake III fast inverse sqrt
  uint16_t x_bits;

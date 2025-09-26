@@ -9,9 +9,9 @@
 */
 
 //trunc
-static inline long irint_z(uint16_t x) {
+static inline int64_t irint_z(uint16_t x) {
 	uint16_t x_bits, mantissa, sign;
- long integer_part;
+ int64_t integer_part;
  
  x_bits = x;
  	
@@ -40,9 +40,9 @@ static inline long irint_z(uint16_t x) {
  
  
 //ceil
-static inline long irint_p(uint16_t x) {
+static inline int64_t irint_p(uint16_t x) {
 	uint16_t x_bits, sign, mantissa;
- long integer_part;
+ int64_t integer_part;
 
  x_bits = x; 	
  sign = x_bits & 0x8000;
@@ -76,9 +76,9 @@ static inline long irint_p(uint16_t x) {
  
  
 //floor
-static inline long irint_n(uint16_t x) {
+static inline int64_t irint_n(uint16_t x) {
  uint16_t x_bits, sign, mantissa;
-	long integer_part;
+	int64_t integer_part;
 	
  x_bits = x;
  sign = x_bits & 0x8000;
@@ -111,9 +111,9 @@ static inline long irint_n(uint16_t x) {
  
  
 //round
-static inline long irint_r(uint16_t x) {
+static inline int64_t irint_r(uint16_t x) {
 	uint16_t x_bits, sign, mantissa;
- long integer_part;
+ int64_t integer_part;
 
  x_bits = x;
  sign = x_bits & 0x8000;
@@ -143,7 +143,7 @@ static inline long irint_r(uint16_t x) {
 }
  
 
-long fp16_lrint(uint16_t x) {
+int64_t fp16_lrint(uint16_t x) {
  switch(fegetround()) {
  	case FE_TOWARDZERO:
  	 return irint_z(x);
