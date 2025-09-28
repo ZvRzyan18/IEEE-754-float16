@@ -2,6 +2,8 @@
 #include "fp16/float16.h"
 #include "fp16/float32.h"
 
+#include <fenv.h>
+
 /*
  asin 3 degree polynomial
 */
@@ -55,8 +57,10 @@ uint16_t fp16_acos(uint16_t x) {
 	sign = (uint32_t)(x & 0x8000) << 16;
 	x &= 0x7FFF;
 	
-	if(x > 0x3C00) // |x| > 1.0
+	if(x > 0x3C00) {// |x| > 1.0
+	 feraiseexcept(FE_INVALID);
 	 return 0x7C00; //inf
+	}
 	
 	mx = __fp32_tofloat32(x);
 	

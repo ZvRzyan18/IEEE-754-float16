@@ -2,6 +2,8 @@
 #include "fp16/float16.h"
 #include "fp16/float32.h"
 
+#include <fenv.h>
+
 static const uint32_t c[10] = {
 	0xBC14E9A5,
 	0x3DFDA2D1,
@@ -34,8 +36,10 @@ uint16_t fp16_log2(uint16_t x) {
 	uint32_t mx;
 	
 	sign = x & 0x8000;
-	if(sign) 
+	if(sign) {
+	 feraiseexcept(FE_INVALID);
 	 return 0x7C01;
+	}
 	if((x & 0x7FFF) >= 0x7C00) //inf, nan
 	 return x;
 	mx = __fp32_tofloat32(x);

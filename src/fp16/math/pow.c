@@ -2,6 +2,7 @@
 #include "fp16/float16.h"
 #include "fp16/float32.h"
 
+#include <fenv.h>
 
 static const uint32_t c[16] = {
 	0x39658674,
@@ -88,9 +89,11 @@ uint16_t fp16_pow(uint16_t x, uint16_t y) {
 		 return __fp32_tofloat16(out);
 		break;
 		case 1: //overflow
+		 feraiseexcept(FE_OVERFLOW);
 		 return 0x7C00;
 		break;
 		case 2: //underflow
+		 feraiseexcept(FE_UNDERFLOW);
 		 return 0;
 		break;
 	}

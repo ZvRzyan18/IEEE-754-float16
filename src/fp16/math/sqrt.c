@@ -1,6 +1,7 @@
 #include "fp16/math.h"
 #include "fp16/float16.h"
 
+#include <fenv.h>
 /*
  square root
  
@@ -11,7 +12,11 @@ uint16_t fp16_sqrt(uint16_t x) {
  uint16_t x_bits;
 
  x_bits = x;
- 	
+ if(x_bits & 0x8000) {
+  feraiseexcept(FE_INVALID);
+  return 0x7C01;
+ }
+
  //inf, nan
 	if((x_bits & 0x7FFF) >= 0x7C00)
  	return x;
