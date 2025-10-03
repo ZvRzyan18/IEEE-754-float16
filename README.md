@@ -1,19 +1,35 @@
 # IEEE-754-float16
-complete set of floating point operation, including 
+complete software implementation of float16 written in c99
 
+## Operation
  • Arithmetic (+, -, *, /), (`fp16_add`, `fp16_sub`, `fp16_mul`, `fp16_div`)
 
  • Compare (>, <, <=, >=, ==, !=), 
    (`fp16_gt`, `fp16_lt`, `fp16_lte`, `fp16_gte`, `fp16_eq`, `fp16_neq`)
  
- • Special case handle (inf, nan, subnormal, overflow, undeflow)
+ • Special case handle (inf, nan, subnormal)
 
  • Rounding (rint, lrint, trunc, ceil, floor, round)
  
  • Math operations (trigonometry, exponental, logarithmic, roots, etc..)
 
  • Special functions (`fp16_fma`, `fp16_ilogb`, `fp16_hypot`, `fp16_significand`, `fp16_scalb`, `fp16_scalbn`)
+## Supported Exception
+• INVALID
 
+• OVERFLOW
+
+• UNDERFLOW
+
+• INEXACT
+## Supported Rounding
+• TOWARDZERO
+
+• UPWARD
+
+• DOWNWARD
+
+• TONEAREST
 ## C++ Example
 ```cpp
  #include "fp16/float16.hpp"
