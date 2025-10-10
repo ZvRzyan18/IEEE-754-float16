@@ -8,9 +8,9 @@
  
  1.xxx (mantissa value)
 */
-uint16_t fp16_significand(uint16_t x) {
+fp5x10 fp16_significand(fp5x10 x) {
 	if((x & 0x7FFF) > 0x7C00) //inf, nan
-	 return 0x7C01;
+	 return 0;
 	return (15 << 10) | (x & 0x03FF);
 }
 

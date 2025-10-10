@@ -4,11 +4,11 @@
 /*
  absolute value
 */
-uint16_t fp16_abs(uint16_t x) {
- uint16_t mx;
+fp5x10 fp16_abs(fp5x10 x) {
+ fp5x10 mx;
  mx = x & 0x7FFF; //set sign bit to zero
  if(mx > 0x7C00) //inf, nan
-  return 0x7C01;
+  return x;
  return mx;
 }
 

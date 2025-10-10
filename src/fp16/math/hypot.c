@@ -28,12 +28,12 @@
 */
 
 //32 bit sqrt
-static inline uint32_t __sqrt(uint32_t x) {
-	uint32_t x_bits, mx;
+static inline fp8x23 __sqrt(fp8x23 x) {
+	fp8x23 x_bits, mx;
 	int32_t x_exponent;
 	x_bits = x;
 	x_exponent = (int32_t)((x_bits >> 23) - 127) >> 1;
-	x_bits = (x_bits & 0x007FFFFF) | ((uint32_t)(x_exponent + 127) << 23);
+	x_bits = (x_bits & 0x007FFFFF) | ((fp8x23)(x_exponent + 127) << 23);
 	mx = x_bits;
 	
 	for(int i = 0; i < 3; i++) {
@@ -44,8 +44,8 @@ static inline uint32_t __sqrt(uint32_t x) {
 }
 
 
-uint16_t fp16_hypot(uint16_t x, uint16_t y) {
-	uint32_t mx, my;
+fp5x10 fp16_hypot(fp5x10 x, fp5x10 y) {
+	fp8x23 mx, my;
 	
 	mx = __fp32_tofloat32(x);
 	my = __fp32_tofloat32(y);

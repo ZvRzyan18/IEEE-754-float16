@@ -7,7 +7,7 @@
 /*
  asin 3 degree polynomial
 */
-static const uint32_t c[8] = {
+static const fp8x23 c[8] = {
 	0x3D9E9188,
 	0x3CD61314,
 	0x3D9DF4C6,
@@ -35,12 +35,12 @@ static const uint32_t c[8] = {
   angle = acos(x)
 */
 //32 bit sqrt
-static inline uint32_t __sqrt(uint32_t x) {
-	uint32_t x_bits, mx;
+static inline fp8x23 __sqrt(fp8x23 x) {
+	fp8x23 x_bits, mx;
 	int32_t x_exponent;
 	x_bits = x;
 	x_exponent = (int32_t)((x_bits >> 23) - 127) >> 1;
-	x_bits = (x_bits & 0x007FFFFF) | ((uint32_t)(x_exponent + 127) << 23);
+	x_bits = (x_bits & 0x007FFFFF) | ((fp8x23)(x_exponent + 127) << 23);
 	mx = x_bits;
 	
 	for(int i = 0; i < 3; i++) {
@@ -51,15 +51,18 @@ static inline uint32_t __sqrt(uint32_t x) {
 }
 
 
-uint16_t fp16_acos(uint16_t x) {
-	uint32_t mx, x2, x3, poly, high, sign;
+fp5x10 fp16_acos(fp5x10 x) {
+	fp8x23 mx, x2, x3, poly, high, sign;
 	
-	sign = (uint32_t)(x & 0x8000) << 16;
+	sign = (fp8x23)(x & 0x8000) << 16;
 	x &= 0x7FFF;
+	
+	if(x >= 0x7C00) //inf, nan
+	 return 0x7C01;
 	
 	if(x > 0x3C00) {// |x| > 1.0
 	 feraiseexcept(FE_INVALID);
-	 return 0x7C00; //inf
+	 return 0x7C01; //nan
 	}
 	
 	mx = __fp32_tofloat32(x);
