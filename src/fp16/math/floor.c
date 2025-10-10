@@ -4,18 +4,16 @@
 /*
  round to negative infinity
 */
-uint16_t fp16_floor(uint16_t x) {
-	uint16_t x_bits, out_bits, sign, mantissa, mask;
+fp5x10 fp16_floor(fp5x10 x) {
+	fp5x10 x_bits, out_bits, sign, mantissa, mask;
   	
  x_bits = x;
  sign = x_bits & 0x8000;
 	x_bits &= 0x7FFF;
  	
 	//inf, nan
-	if(x_bits >= 0x7C00)	{
-	 out_bits = 0x7C01;
-  return out_bits;
-	}
+	if(x_bits >= 0x7C00)
+  return x;
  	
 	int16_t exponent = (x_bits >> 10) - 15;
  	

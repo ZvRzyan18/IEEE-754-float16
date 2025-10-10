@@ -9,8 +9,8 @@
 */
 
 //trunc
-static inline int64_t irint_z(uint16_t x) {
-	uint16_t x_bits, mantissa, sign;
+static inline int64_t irint_z(fp5x10 x) {
+	fp5x10 x_bits, mantissa, sign;
  int64_t integer_part;
  
  x_bits = x;
@@ -20,7 +20,7 @@ static inline int64_t irint_z(uint16_t x) {
  	
 	//inf, nan
 	if(x_bits >= 0x7C00)
-  return 0x7FFFFFFF;
+  return 0;
  	
  int16_t exponent = (x_bits >> 10) - 15;
  	
@@ -40,8 +40,8 @@ static inline int64_t irint_z(uint16_t x) {
  
  
 //ceil
-static inline int64_t irint_p(uint16_t x) {
-	uint16_t x_bits, sign, mantissa;
+static inline int64_t irint_p(fp5x10 x) {
+	fp5x10 x_bits, sign, mantissa;
  int64_t integer_part;
 
  x_bits = x; 	
@@ -50,7 +50,7 @@ static inline int64_t irint_p(uint16_t x) {
  	
  //inf, nan
  if(x_bits >= 0x7C00)
- 	return 0x7FFFFFFF;
+ 	return 0;
  	 
  	int16_t exponent = (x_bits >> 10) - 15;
  	
@@ -76,8 +76,8 @@ static inline int64_t irint_p(uint16_t x) {
  
  
 //floor
-static inline int64_t irint_n(uint16_t x) {
- uint16_t x_bits, sign, mantissa;
+static inline int64_t irint_n(fp5x10 x) {
+ fp5x10 x_bits, sign, mantissa;
 	int64_t integer_part;
 	
  x_bits = x;
@@ -86,7 +86,7 @@ static inline int64_t irint_n(uint16_t x) {
  	
  //inf, nan
  if(x_bits >= 0x7C00)
- 	return 0x7FFFFFFF;
+ 	return 0;
  	 
  int16_t exponent = (x_bits >> 10) - 15;
  	
@@ -111,8 +111,8 @@ static inline int64_t irint_n(uint16_t x) {
  
  
 //round
-static inline int64_t irint_r(uint16_t x) {
-	uint16_t x_bits, sign, mantissa;
+static inline int64_t irint_r(fp5x10 x) {
+	fp5x10 x_bits, sign, mantissa;
  int64_t integer_part;
 
  x_bits = x;
@@ -121,7 +121,7 @@ static inline int64_t irint_r(uint16_t x) {
  	
 	//inf, nan
 	if(x_bits >= 0x7C00)
-  return 0x7FFFFFFF;
+  return 0;
  	
  int16_t exponent = (x_bits >> 10) - 15;
  	
@@ -135,7 +135,7 @@ static inline int64_t irint_r(uint16_t x) {
    integer_part = mantissa << (exponent - 10);
  else {
   int shift = 10 - exponent;
-  uint16_t roundBit = (mantissa >> (shift - 1)) & 1;
+  fp5x10 roundBit = (mantissa >> (shift - 1)) & 1;
   integer_part = mantissa >> shift;
   integer_part += roundBit;
  }
@@ -143,7 +143,7 @@ static inline int64_t irint_r(uint16_t x) {
 }
  
 
-int64_t fp16_lrint(uint16_t x) {
+int64_t fp16_lrint(fp5x10 x) {
  switch(fegetround()) {
  	case FE_TOWARDZERO:
  	 return irint_z(x);

@@ -1,7 +1,8 @@
 #ifndef FP16_FLOAT32_H
 #define FP16_FLOAT32_H
 
-#include <stdint.h>
+#include "fp16/fptypes.h"
+
 #include <fenv.h>
 /*
  IEEE 754 float 32 
@@ -13,13 +14,13 @@
 //min - exp : -126
 
 
-static inline uint32_t __fp32_tofloat32(uint16_t x) {
- uint32_t sign = x >> 15;
- uint32_t exp16 = (x & 0x7FFF) >> 10;
- uint32_t mant16 = x & 0x03FF;
+static inline fp8x23 __fp32_tofloat32(fp5x10 x) {
+ fp8x23 sign = x >> 15;
+ fp8x23 exp16 = (x & 0x7FFF) >> 10;
+ fp8x23 mant16 = x & 0x03FF;
 
- uint32_t sign32 = sign << 31;
- uint32_t exp32, mant32;
+ fp8x23 sign32 = sign << 31;
+ fp8x23 exp32, mant32;
 
  if(exp16 == 0) {
   if(mant16 == 0) {
@@ -27,13 +28,13 @@ static inline uint32_t __fp32_tofloat32(uint16_t x) {
   } else {
    // subnormal
    int shift = 0;
-   uint32_t mant = mant16;
+   fp8x23 mant = mant16;
    while((mant & 0x400) == 0) {
     mant <<= 1;
     shift++;
    }
-   mant &= 0x3FF;
-   exp32 = 127 - 15 - shift;
+   mant &= 0x03FF;
+   exp32 = -14 - shift + 127;
    mant32 = mant << 13;
   }
  } else if(exp16 == 0x1F) {
@@ -46,22 +47,22 @@ static inline uint32_t __fp32_tofloat32(uint16_t x) {
  }
  
  //no need rounding since no bits lost
- return sign32 | (exp32 << 23) | mant32;
+ return sign32 | (exp32 << 23) | (mant32 & 0x007FFFFF);
 }
 
 
-static inline uint16_t __fp32_tofloat16(uint32_t x) {
- uint32_t bits = x;
- uint32_t sign = bits >> 31;
+static inline fp5x10 __fp32_tofloat16(fp8x23 x) {
+ fp8x23 bits = x;
+ fp8x23 sign = bits >> 31;
  int32_t exp32 = (bits & 0x7FFFFFFF) >> 23;
- uint32_t mant32 = bits & 0x007FFFFF;
+ fp8x23 mant32 = bits & 0x007FFFFF;
  
- uint16_t grs = 0;
- uint16_t inexact = 0;
+ fp5x10 grs = 0;
+ fp5x10 inexact = 0;
 
- uint16_t sign16 = sign << 15;
- uint16_t exp16 = 0;
- uint16_t mant16 = 0;
+ fp5x10 sign16 = sign << 15;
+ fp5x10 exp16 = 0;
+ fp5x10 mant16 = 0;
  
  if((x & 0x7FFFFFFF) == 0)
   return 0;
@@ -81,17 +82,17 @@ static inline uint16_t __fp32_tofloat16(uint32_t x) {
    return 0;
   } else {
    //subnormal
-   uint32_t mant = mant32 | 0x800000;
+   fp8x23 mant = mant32 | 0x800000;
    int32_t shift = 113 - exp32;
    mant16 = mant >> (shift + 13);
-   inexact |= (uint16_t)(mant & ((1 << (shift + 14))-1)) != 0;
-   grs = (uint16_t)((mant >> (shift + 10)) & 0x00000007);
+   inexact |= (fp5x10)(mant & ((1 << (shift + 14))-1)) != 0;
+   grs = (fp5x10)((mant >> (shift + 10)) & 0x00000007);
   }
  } else {
   exp16 = exp32 - 127 + 15;
   mant16 = mant32 >> 13;
-  inexact |= (uint16_t)(mant32 & ((1 << 14)-1)) != 0;
-  grs = (uint16_t)((mant32 >> 10) & 0x00000007);
+  inexact |= (fp5x10)(mant32 & ((1 << 14)-1)) != 0;
+  grs = (fp5x10)((mant32 >> 10) & 0x00000007);
  }
  
  if(inexact)
@@ -102,17 +103,17 @@ static inline uint16_t __fp32_tofloat16(uint32_t x) {
  /*
   inexact rounding
  */
-  uint16_t guard = (grs >> 2) & 1;
-  uint16_t round = (grs >> 1) & 1;
-  uint16_t sticky = grs & 1;
+  fp5x10 guard = (grs >> 2) & 1;
+  fp5x10 round = (grs >> 1) & 1;
+  fp5x10 sticky = grs & 1;
 
-  uint16_t out_mantissa = mant16;
+  fp5x10 out_mantissa = mant16;
   
   //only add leading one for non subnormal
   if(exp16 > 0)
    out_mantissa |= (1 << 10);
   
-  uint16_t increment = 0;
+  fp5x10 increment = 0;
 
   switch(fegetround()) {
    case FE_TONEAREST:
@@ -161,16 +162,16 @@ static inline uint16_t __fp32_tofloat16(uint32_t x) {
 
 
 
-static inline uint32_t __unsigned_add_bit(uint32_t a, uint32_t b) {
- uint32_t a_bits, b_bits, out_bits, final_exponent, final_mantissa, shift, inexact;
+static inline fp8x23 __unsigned_add_bit(fp8x23 a, fp8x23 b) {
+ fp8x23 a_bits, b_bits, out_bits, final_exponent, final_mantissa, shift, inexact;
  a_bits = a;
  b_bits = b;
 	
 	int32_t a_exponent = (int32_t)(a_bits >> 23) - 127;
  int32_t b_exponent = (int32_t)(b_bits >> 23) - 127;
  
- uint32_t a_mantissa = (a_bits & 0x007FFFFF);
- uint32_t b_mantissa = (b_bits & 0x007FFFFF);
+ fp8x23 a_mantissa = (a_bits & 0x007FFFFF);
+ fp8x23 b_mantissa = (b_bits & 0x007FFFFF);
 
  // add leading ones
  if(a_exponent >= -126)
@@ -214,8 +215,8 @@ static inline uint32_t __unsigned_add_bit(uint32_t a, uint32_t b) {
 
 
 
-static inline uint32_t __unsigned_sub_bit(uint32_t a, uint32_t b) {
- uint32_t a_bits, b_bits, out_bits, shift, inexact;
+static inline fp8x23 __unsigned_sub_bit(fp8x23 a, fp8x23 b) {
+ fp8x23 a_bits, b_bits, out_bits, shift, inexact;
  int32_t final_mantissa, final_exponent;
  a_bits = a;
 	b_bits = b;
@@ -228,8 +229,8 @@ static inline uint32_t __unsigned_sub_bit(uint32_t a, uint32_t b) {
 	int32_t a_exponent = (int32_t)(a_bits >> 23) - 127;
 	int32_t b_exponent = (int32_t)(b_bits >> 23) - 127;
 
- uint32_t a_mantissa = (a_bits & 0x007FFFFF);
- uint32_t b_mantissa = (b_bits & 0x007FFFFF);
+ fp8x23 a_mantissa = (a_bits & 0x007FFFFF);
+ fp8x23 b_mantissa = (b_bits & 0x007FFFFF);
  
  // add leading ones
  if(a_exponent >= -126)
@@ -267,17 +268,21 @@ static inline uint32_t __unsigned_sub_bit(uint32_t a, uint32_t b) {
 }
 
 
-static inline uint32_t fp32_add(uint32_t a, uint32_t b) {
- uint32_t a_sign = a & 0x80000000;
- uint32_t b_sign = b & 0x80000000;
+static inline fp8x23 fp32_add(fp8x23 a, fp8x23 b) {
+ fp8x23 a_sign = a & 0x80000000;
+ fp8x23 b_sign = b & 0x80000000;
   
  a &= 0x7FFFFFFF;
  b &= 0x7FFFFFFF;
  
  //inf nan
  if(a >= 0x7F800000 || b >= 0x7F800000) {
-  return 0x7F800001;
+  if(a == 0x7F800000 || b == 0x7F800000)
+   return 0x7F800000;
+  else
+   return 0x7F800001;
  }
+ 
  if(a_sign == b_sign) {
   return __unsigned_add_bit(a, b) | a_sign;
  } else {
@@ -292,16 +297,19 @@ static inline uint32_t fp32_add(uint32_t a, uint32_t b) {
 
 
 
-static inline uint32_t fp32_sub(uint32_t a, uint32_t b) {
- uint32_t a_sign = a & 0x80000000;
- uint32_t b_sign = b & 0x80000000;
+static inline fp8x23 fp32_sub(fp8x23 a, fp8x23 b) {
+ fp8x23 a_sign = a & 0x80000000;
+ fp8x23 b_sign = b & 0x80000000;
   
   a &= 0x7FFFFFFF;
   b &= 0x7FFFFFFF;
   
  //inf nan
  if(a >= 0x7F800000 || b >= 0x7F800000) {
-  return 0x7F800001;
+  if(a == 0x7F800000 || b == 0x7F800000)
+   return 0x7F800000;
+  else
+   return 0x7F800001;
  }
  
  if(a_sign == b_sign) {
@@ -319,8 +327,8 @@ static inline uint32_t fp32_sub(uint32_t a, uint32_t b) {
 
 
 
-static inline uint32_t fp32_mul(uint32_t a, uint32_t b) {
-	uint32_t a_bits, b_bits, out_bits, sign, inexact;
+static inline fp8x23 fp32_mul(fp8x23 a, fp8x23 b) {
+	fp8x23 a_bits, b_bits, out_bits, sign, inexact;
 	int32_t exponent;
 	uint64_t mantissa;
 	
@@ -347,7 +355,10 @@ static inline uint32_t fp32_mul(uint32_t a, uint32_t b) {
  	
  //inf nan
  if(a_bits >= 0x7F800000 || b_bits >= 0x7F800000) {
- 	return 0x7F800001;
+  if(a_bits == 0x7F800000 || b_bits == 0x7F800000)
+   return 0x7F800000;
+  else
+   return 0x7F800001;
  }
 	
 	int32_t a_exponent = (int32_t)((a_bits) >> 23) - 127;
@@ -355,8 +366,8 @@ static inline uint32_t fp32_mul(uint32_t a, uint32_t b) {
 
  exponent = a_exponent + b_exponent;
  
- uint32_t a_mantissa = a_bits & 0x007FFFFF;
- uint32_t b_mantissa = b_bits & 0x007FFFFF;
+ fp8x23 a_mantissa = a_bits & 0x007FFFFF;
+ fp8x23 b_mantissa = b_bits & 0x007FFFFF;
  
  //add leading one to mantissa 1.(mantissa value)
  if(a_exponent >= -126)
@@ -394,17 +405,17 @@ static inline uint32_t fp32_mul(uint32_t a, uint32_t b) {
   } else {
    //subnormal
    mantissa >>= shift;
-   return sign | ((uint32_t)mantissa & 0x007FFFFF);
+   return sign | ((fp8x23)mantissa & 0x007FFFFF);
   }
  }
  
- out_bits = sign | ((exponent + 127) << 23) | ((uint32_t)mantissa & 0x007FFFFF);
+ out_bits = sign | ((exponent + 127) << 23) | ((fp8x23)mantissa & 0x007FFFFF);
  return out_bits;
 }
 
 
-static inline uint32_t fp32_div(uint32_t a, uint32_t b) {
-	uint32_t a_bits, b_bits, out_bits, sign;
+static inline fp8x23 fp32_div(fp8x23 a, fp8x23 b) {
+	fp8x23 a_bits, b_bits, out_bits, sign;
 	int32_t exponent;
 	uint64_t mantissa;
 	
@@ -433,7 +444,10 @@ static inline uint32_t fp32_div(uint32_t a, uint32_t b) {
 
  //inf nan
  if(a_bits >= 0x7F800000 || b_bits >= 0x7F800000) {
- 	return 0x7F800001;
+  if(a_bits == 0x7F800000 || b_bits == 0x7F800000)
+   return 0x7F800000;
+  else
+   return 0x7F800001;
  }
 	
 	int32_t a_exponent = (int32_t)((a_bits) >> 23) - 127;
@@ -441,8 +455,8 @@ static inline uint32_t fp32_div(uint32_t a, uint32_t b) {
 
  exponent = a_exponent - b_exponent;
  
- uint32_t a_mantissa = a_bits & 0x007FFFFF;
- uint32_t b_mantissa = b_bits & 0x007FFFFF;
+ fp8x23 a_mantissa = a_bits & 0x007FFFFF;
+ fp8x23 b_mantissa = b_bits & 0x007FFFFF;
  
  //add leading one to mantissa 1.(mantissa value)
  if(a_exponent >= -126)
@@ -452,9 +466,9 @@ static inline uint32_t fp32_div(uint32_t a, uint32_t b) {
  
 
  //divide mantissa
- mantissa = (uint32_t)(a_mantissa);
+ mantissa = (fp8x23)(a_mantissa);
  mantissa <<= 23;
- mantissa /= (uint32_t)b_mantissa;
+ mantissa /= (fp8x23)b_mantissa;
  	 
  //normalize
  while((mantissa & (1 << 23)) == 0 && mantissa != 0) {
@@ -475,11 +489,11 @@ static inline uint32_t fp32_div(uint32_t a, uint32_t b) {
   } else {
    //subnormal
    mantissa >>= shift;
-   return sign | ((uint32_t)mantissa & 0x007FFFFF);
+   return sign | ((fp8x23)mantissa & 0x007FFFFF);
   }
  }
   
-	out_bits = sign | ((exponent + 127) << 23) | ((uint32_t)mantissa & 0x007FFFFF);
+	out_bits = sign | ((exponent + 127) << 23) | ((fp8x23)mantissa & 0x007FFFFF);
  return out_bits;
 }
 
@@ -488,9 +502,9 @@ static inline uint32_t fp32_div(uint32_t a, uint32_t b) {
  compare operator
 */
 
-static inline uint32_t fp32_gt(uint32_t a, uint32_t b) {
-	uint32_t a_sign = a & 0x80000000;
- uint32_t b_sign = b & 0x80000000;
+static inline fp8x23 fp32_gt(fp8x23 a, fp8x23 b) {
+	fp8x23 a_sign = a & 0x80000000;
+ fp8x23 b_sign = b & 0x80000000;
 	a &= 0x7FFFFFFF;
  b &= 0x7FFFFFFF;
  if(a <= 0x7F800000 && b <= 0x7F800000) {
@@ -508,9 +522,9 @@ static inline uint32_t fp32_gt(uint32_t a, uint32_t b) {
 }
  
  
-static inline uint32_t fp32_lt(uint32_t a, uint32_t b) {
- uint32_t a_sign = a & 0x80000000;
-	uint32_t b_sign = b & 0x80000000;
+static inline fp8x23 fp32_lt(fp8x23 a, fp8x23 b) {
+ fp8x23 a_sign = a & 0x80000000;
+	fp8x23 b_sign = b & 0x80000000;
 	a &= 0x7FFFFFFF;
  b &= 0x7FFFFFFF;
  if(a <= 0x7F800000 && b <= 0x7F800000) {
@@ -527,9 +541,9 @@ static inline uint32_t fp32_lt(uint32_t a, uint32_t b) {
 	return 0;
 }
  
-static inline uint32_t fp32_gte(uint32_t a, uint32_t b) {
- uint32_t a_sign = a & 0x80000000;
- uint32_t b_sign = b & 0x80000000;
+static inline fp8x23 fp32_gte(fp8x23 a, fp8x23 b) {
+ fp8x23 a_sign = a & 0x80000000;
+ fp8x23 b_sign = b & 0x80000000;
 	a &= 0x7FFFFFFF;
 	b &= 0x7FFFFFFF;
 	if(a <= 0x7F800000 && b <= 0x7F800000) {
@@ -547,9 +561,9 @@ static inline uint32_t fp32_gte(uint32_t a, uint32_t b) {
 }
  
  
-static inline uint32_t fp32_lte(uint32_t a, uint32_t b) {
-	uint32_t a_sign = a & 0x80000000;
- uint32_t b_sign = b & 0x80000000;
+static inline fp8x23 fp32_lte(fp8x23 a, fp8x23 b) {
+	fp8x23 a_sign = a & 0x80000000;
+ fp8x23 b_sign = b & 0x80000000;
  a &= 0x7FFFFFFF;
 	b &= 0x7FFFFFFF;
  if(a <= 0x7F800000 && b <= 0x7F800000) {
@@ -567,9 +581,9 @@ static inline uint32_t fp32_lte(uint32_t a, uint32_t b) {
 }
  
  
-static inline uint32_t fp32_eq(uint32_t a, uint32_t b) {
-	uint32_t sign_a = a & 0x80000000;
-	uint32_t sign_b = b & 0x80000000;
+static inline fp8x23 fp32_eq(fp8x23 a, fp8x23 b) {
+	fp8x23 sign_a = a & 0x80000000;
+	fp8x23 sign_b = b & 0x80000000;
 	a &= 0x7FFFFFFF;
  b &= 0x7FFFFFFF;
 	if(a <= 0x7F800000 && b <= 0x7F800000) {
@@ -580,13 +594,13 @@ static inline uint32_t fp32_eq(uint32_t a, uint32_t b) {
 }
 
 
-static inline uint32_t fp32_neq(uint32_t a, uint32_t b) {
+static inline fp8x23 fp32_neq(fp8x23 a, fp8x23 b) {
  return !fp32_eq(a, b);
 }
 
 
-static inline uint32_t fp32_longtofloat32(int64_t x) {
- uint32_t sign, input, exponent, mantissa;
+static inline fp8x23 fp32_longtofloat32(int64_t x) {
+ fp8x23 sign, input, exponent, mantissa;
  int32_t msb;
  
  if(x == 0)
@@ -612,8 +626,8 @@ static inline uint32_t fp32_longtofloat32(int64_t x) {
 }
 
 
-static inline int64_t fp32_floattolong(uint32_t x) {
-	uint32_t x_bits, mantissa, sign;
+static inline int64_t fp32_floattolong(fp8x23 x) {
+	fp8x23 x_bits, mantissa, sign;
  long integer_part;
  
  x_bits = x;
@@ -643,8 +657,8 @@ static inline int64_t fp32_floattolong(uint32_t x) {
 
 
 
-static inline uint32_t fp32_trunc(uint32_t x) {
- uint32_t x_bits, out_bits, sign, mantissa;
+static inline fp8x23 fp32_trunc(fp8x23 x) {
+ fp8x23 x_bits, out_bits, sign, mantissa;
 
  x_bits = x;
 	sign = x_bits & 0x80000000;
@@ -665,7 +679,7 @@ static inline uint32_t fp32_trunc(uint32_t x) {
  if(exponent >= 23)
   return x; //integral
  	
-	uint32_t mask = 0xFFFFFFFF << (23 - exponent);
+	fp8x23 mask = 0xFFFFFFFF << (23 - exponent);
  mantissa &= mask;
  out_bits = sign | ((exponent + 127) << 23) | mantissa;
  return out_bits;

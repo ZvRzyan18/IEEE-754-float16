@@ -5,7 +5,7 @@
 /*
  atan 4 degree polynomial
 */
-static const uint32_t c[7] = {
+static const fp8x23 c[7] = {
 	0xBC9A60D6,
 	0x3D8F5DEB,
 	0xBE0660F6,
@@ -16,16 +16,16 @@ static const uint32_t c[7] = {
 };
 
 
-uint16_t fp16_atan(uint16_t x) {
-	uint16_t sign;
-	uint32_t mx, x2, x3, poly, high;
+fp5x10 fp16_atan(fp5x10 x) {
+	fp5x10 sign;
+	fp8x23 mx, x2, x3, poly, high;
 	
 	//sign handle
 	sign = x & 0x8000;
 
 	x &= 0x7FFF;
 	if(x == 0x7C00) //inf
-	 return __fp32_tofloat16(c[5]) | sign; //pio2
+	 return 0x3E48 | sign; //pio2
 	 
 	if(x > 0x7C00) //nan
 	 return 0x7C01; //nan

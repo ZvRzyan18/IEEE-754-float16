@@ -9,7 +9,7 @@
 */
 
 
-uint16_t fp16_rint(uint16_t x) {
+fp5x10 fp16_rint(fp5x10 x) {
  switch(fegetround()) {
  	case FE_TOWARDZERO:
  	 return fp16_trunc(x);

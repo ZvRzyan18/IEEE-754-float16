@@ -6,7 +6,7 @@
 /*
  scalb(x, y) = x * 2 ^ y;
 */
-uint16_t fp16_scalbn(uint16_t x, int y) {
+fp5x10 fp16_scalbn(fp5x10 x, int y) {
 	if(y > 15)
 	 feraiseexcept(FE_OVERFLOW);
 	if(y < -14)

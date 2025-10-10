@@ -4,24 +4,22 @@
 /*
  round to nearest
 */
-uint16_t fp16_round(uint16_t x) {
-	uint16_t x_bits, out_bits, sign;
+fp5x10 fp16_round(fp5x10 x) {
+	fp5x10 x_bits, sign;
 
  x_bits = x;
  sign = x_bits & 0x8000;
 	x_bits &= 0x7FFF;
  	
 	//inf, nan
- if(x_bits >= 0x7C00) {
-  out_bits = 0x7C01;
-  return out_bits;
- }
+ if(x_bits >= 0x7C00)
+  return x;
  	
- uint16_t half = 0x3800; // 0.5f
- uint16_t one = 0x3C00; // 1.0f
+ fp5x10 half = 0x3800; // 0.5f
+ fp5x10 one = 0x3C00; // 1.0f
  
- uint16_t whole = fp16_trunc(x_bits);
- uint16_t frac = fp16_sub(x_bits, whole);
+ fp5x10 whole = fp16_trunc(x_bits);
+ fp5x10 frac = fp16_sub(x_bits, whole);
  
  if(fp16_gte(frac, half))
   return fp16_add(whole, one) | sign;

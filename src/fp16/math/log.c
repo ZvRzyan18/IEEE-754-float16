@@ -4,7 +4,7 @@
 
 #include <fenv.h>
 
-static const uint32_t c[11] = {
+static const fp8x23 c[11] = {
 	0xBC14E9A5,
 	0x3DFDA2D1,
 	0xBF3F945A,
@@ -21,9 +21,9 @@ static const uint32_t c[11] = {
 /*
  natural logarithm
 */
-static inline uint32_t __log2(uint32_t x) {
+static inline fp8x23 __log2(fp8x23 x) {
  int32_t whole;
- uint32_t m, poly;
+ fp8x23 m, poly;
  
  m = 1065353216U | (x & 0x007FFFFF);
  whole = (x >> 23) - 127;
@@ -32,9 +32,9 @@ static inline uint32_t __log2(uint32_t x) {
 }
 
 
-uint16_t fp16_log(uint16_t x) {
-	uint16_t sign;
-	uint32_t mx;
+fp5x10 fp16_log(fp5x10 x) {
+	fp5x10 sign;
+	fp8x23 mx;
 	
 	sign = x & 0x8000;
 	if(sign) {

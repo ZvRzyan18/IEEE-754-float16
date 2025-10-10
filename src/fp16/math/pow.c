@@ -4,7 +4,7 @@
 
 #include <fenv.h>
 
-static const uint32_t c[16] = {
+static const fp8x23 c[16] = {
 	0x39658674,
 	0x3AA252D4,
 	0x3C1EADBC,
@@ -24,13 +24,14 @@ static const uint32_t c[16] = {
 	0xC05B39A4,
 };
 
+
 /*
  power function
  
  pow(x, y) = x ^ y
 */
-static inline uint32_t __exp2(uint32_t x, uint32_t *out) {
-	uint32_t whole_part, poly;
+static inline fp8x23 __exp2(fp8x23 x, fp8x23 *out) {
+	fp8x23 whole_part, poly;
 	int32_t whole;
 	
 	whole = (int32_t)fp32_floattolong(x);
@@ -47,9 +48,9 @@ static inline uint32_t __exp2(uint32_t x, uint32_t *out) {
 }
 
 
-static inline uint32_t __log2(uint32_t x) {
+static inline fp8x23 __log2(fp8x23 x) {
  int32_t whole;
- uint32_t m, poly;
+ fp8x23 m, poly;
  
  m = 1065353216U | (x & 0x007FFFFF);
  whole = (x >> 23) - 127;
@@ -57,18 +58,56 @@ static inline uint32_t __log2(uint32_t x) {
  return fp32_add(fp32_longtofloat32(whole), poly);
 }
 
-//TODO : handle inf, nan correctly
+
 /*
  bit useless since it easily reach overflow
 */
-uint16_t fp16_pow(uint16_t x, uint16_t y) {
-	uint32_t out, mx, is_negative, sign;
+fp5x10 fp16_pow(fp5x10 x, fp5x10 y) {
+	fp8x23 out, mx, is_negative, sign;
+	fp5x10 bx, by, x_sign, y_sign;
 	
-	sign = (uint32_t)(x & 0x8000) << 16;
+	bx = x & 0x7FFF;
+	by = y & 0x7FFF;
+	x_sign = x & 0x8000;
+	y_sign = y & 0x8000;
+
+ /*
+  special cases
+ */
+	if(by == 0)
+	 return 0x3C00;
+	if(by == 0x3C00)
+	 return x;
+
+
+	if(bx == 0 && (!y_sign && by > 0 && by <= 0x7C00))
+	 return 0;
+ if(bx == 0x7C00 && by > 0 && by <= 0x7C00 && !y_sign)
+  return 0x7C00;
+ if(bx == 0x7C00 && by > 0 && by <= 0x7C00 && y_sign)
+  return 0;
+
+ //either x or y is nan or inf
+ if(bx >= 0x7C00 || by >= 0x7C00) {
+	 if(bx > 0x7C00 || by > 0x7C00)
+	  return 0x7C01;
+ 	if(bx > 0x3C00 && by == 0x7C00 && !y_sign)
+	  return 0x7C00;
+	 if(bx > 0x3C00 && by == 0x7C00 && y_sign)
+	  return 0;
+ 	if(bx < 0x3C00 && by == 0x7C00 && !y_sign)
+	  return 0;
+ 	if(bx < 0x3C00 && by == 0x7C00 && y_sign)
+	  return 0x7C00;
+ 	if(bx == 0x3C00 && by == 0x7C00)
+	  return 0x7C01;
+	 if(bx == 0 && (!y_sign && by > 0x7C00))
+	  return 0x7C00;
+ }
+ 
+	sign = (fp8x23)(x & 0x8000) << 16;
 	if(sign) 
 	 return 0x7C01;
-	if((x & 0x7FFF) >= 0x7C00) //inf, nan
-	 return x;
 	mx = __fp32_tofloat32(x);
 	if((mx >> 23) < 127) {
 	 mx = fp32_div(c[6], mx);

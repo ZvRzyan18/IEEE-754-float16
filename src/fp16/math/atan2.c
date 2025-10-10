@@ -5,7 +5,7 @@
 /*
  atan 4 degree polynomial
 */
-static const uint32_t c[7] = {
+static const fp8x23 c[7] = {
 	0xBC9A60D6,
 	0x3D8F5DEB,
 	0xBE0660F6,
@@ -35,9 +35,10 @@ static const uint32_t c[7] = {
   the value could be reversed by arc tangent
 */
 
+//pi 0x4248
 //base arc tangent
-static inline uint32_t __atan(uint32_t x) {
-	uint32_t mx, x2, x3, poly, high, sign;
+static inline fp8x23 __atan(fp8x23 x) {
+	fp8x23 mx, x2, x3, poly, high, sign;
 	sign = x & 0x80000000;
 
 	x &= 0x7FFFFFFF;
@@ -58,10 +59,51 @@ static inline uint32_t __atan(uint32_t x) {
  return mx | sign;
 }
 
-// TODO : handle inf, nan correctly
-uint16_t fp16_atan2(uint16_t y, uint16_t x) {
- uint32_t ratio;
+
+fp5x10 fp16_atan2(fp5x10 y, fp5x10 x) {
+ 
+ fp5x10 mx, my, x_sign, y_sign;
+ fp8x23 ratio;
+ 
+ mx = x & 0x7FFF;
+ my = y & 0x7FFF;
+ x_sign = x & 0x8000;
+ y_sign = y & 0x8000;
+ 
+ /*
+  special cases
+ */
+ if(mx == 0 && my == 0)
+  return 0;
+ 
+ //either x or y is nan or inf
+ if(mx >= 0x7C00 || my >= 0x7C00) {
+  if(mx > 0x7C00 || my > 0x7C00)
+   return 0x7C01;
+  if(mx < 0x7C00 && my == 0x7C00 && !y_sign)
+   return x_sign;
+  if(mx < 0x7C00 && my == 0x7C00 && y_sign)
+   return 0x4248 | x_sign;
+  if(mx == 0x7C00 && my == 0x7C00 && !y_sign) 
+   return 0x3A48 | x_sign; //pio4
+  if(mx == 0x7C00 && my == 0x7C00 && y_sign)
+   return 0x40B6 | x_sign; //3 pi / 4
+  if(mx == 0x7C00 && my > 0 && my < 0x7C00)
+   return 0x3E48 | x_sign;
+ }
+ 
+ if(mx == 0 && (my > 0 && !y_sign))
+  return x_sign;
+ if(mx == 0 && (my > 0 && y_sign))
+  return 0x4248 | x_sign; //pi, x sign
+ if((mx <= 0x7C00 && mx > 0) && my == 0)
+  return 0x3E48 | x_sign; //pio2, x sign
+
+
+ //place it here so it would never raise division by zero
  ratio = fp32_div(__fp32_tofloat32(y), __fp32_tofloat32(x));
+
+
  //handle full circle with quarant correction
  if((y & 0x8000) && (x & 0x8000))
   return __fp32_tofloat16(fp32_sub(__atan(ratio), 0x40490fdb));

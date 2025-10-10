@@ -4,7 +4,7 @@
 
 #include <fenv.h>
 
-static const uint32_t c[8] = {
+static const fp8x23 c[8] = {
 	0x39658674,
 	0x3AA252D4,
 	0x3C1EADBC,
@@ -20,8 +20,8 @@ static const uint32_t c[8] = {
  
  exp10(x) = 10 ^ x
 */
-static inline uint32_t __exp2(uint32_t x, uint32_t *out) {
-	uint32_t whole_part, poly;
+static inline fp8x23 __exp2(fp8x23 x, fp8x23 *out) {
+	fp8x23 whole_part, poly;
 	int32_t whole;
 	
 	whole = (int32_t)fp32_floattolong(x);
@@ -38,8 +38,8 @@ static inline uint32_t __exp2(uint32_t x, uint32_t *out) {
 }
 
 
-uint16_t fp16_exp10(uint16_t x) {
-	uint32_t out, mx, is_negative;
+fp5x10 fp16_exp10(fp5x10 x) {
+	fp8x23 out, mx, is_negative;
 	
 	is_negative = x & 0x8000;
 	

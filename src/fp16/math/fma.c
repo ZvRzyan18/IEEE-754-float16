@@ -8,7 +8,7 @@
 #define RETURN_ZERO 1
 #define RETURN_SAME 2
 #define RETURN_INF 3
-
+#define RETURN_NAN 4
 /*
  # steps for fma(x, y, z)
  
@@ -110,10 +110,10 @@
 /*
  bit by bit multiplication without loosing full precision
 */
-static inline int multiply(uint16_t a, uint16_t b, uint16_t *out_sign, uint16_t *out_exponent, uint32_t *out_mantissa, uint16_t *product) {
-	uint16_t a_bits, b_bits, sign, inexact;
+static inline int multiply(fp5x10 a, fp5x10 b, fp5x10 *out_sign, fp5x10 *out_exponent, fp8x23 *out_mantissa, fp5x10 *product) {
+	fp5x10 a_bits, b_bits, sign, inexact;
 	int16_t exponent;
-	uint32_t mantissa;
+	fp8x23 mantissa;
 	
  a_bits = a;
 	b_bits = b;
@@ -139,18 +139,22 @@ static inline int multiply(uint16_t a, uint16_t b, uint16_t *out_sign, uint16_t 
  	return RETURN_SAME;
 	}
  	
- //inf nan
- if(a_bits >= 0x7C00 || b_bits >= 0x7C00) {
- 	return RETURN_INF;
+ //inf, nan
+ if(a >= 0x7C00 || b >= 0x7C00) {
+  if(a == 0x7C00 || b == 0x7C00)
+   return RETURN_INF;
+  else
+   return RETURN_NAN;
  }
+ 
 	
 	int16_t a_exponent = (int16_t)((a_bits) >> 10) - 15;
 	int16_t b_exponent = (int16_t)((b_bits) >> 10) - 15;
 
  exponent = a_exponent + b_exponent;
  
- uint16_t a_mantissa = a_bits & 0x03FF;
- uint16_t b_mantissa = b_bits & 0x03FF;
+ fp5x10 a_mantissa = a_bits & 0x03FF;
+ fp5x10 b_mantissa = b_bits & 0x03FF;
  
  //add leading one to mantissa 1.(mantissa value)
  if(a_exponent >= -14)
@@ -159,7 +163,7 @@ static inline int multiply(uint16_t a, uint16_t b, uint16_t *out_sign, uint16_t 
  b_mantissa |= 1 << 10;
  
  //dont scale it back to maintain better precision
- mantissa = (uint32_t)a_mantissa * (uint32_t)b_mantissa;
+ mantissa = (fp8x23)a_mantissa * (fp8x23)b_mantissa;
  
  //calculated value
  *out_sign = (0x8000 & a) ^ (0x8000 & b);
@@ -196,7 +200,7 @@ static inline int multiply(uint16_t a, uint16_t b, uint16_t *out_sign, uint16_t 
 		mantissa >>= 1;
 		exponent++;
  }
- *product = sign | ((exponent+15) << 10) | ((uint16_t)mantissa & 0x03FF);
+ *product = sign | ((exponent+15) << 10) | ((fp5x10)mantissa & 0x03FF);
 
  if(exponent > 15) {//overflow
   feraiseexcept(FE_OVERFLOW);
@@ -222,15 +226,15 @@ static inline int multiply(uint16_t a, uint16_t b, uint16_t *out_sign, uint16_t 
 /*
  no sign addition
 */
-static inline uint16_t unsigned_add_bit(uint16_t exponent, uint32_t mantissa, uint16_t b, uint16_t *grs) {
- uint16_t b_bits, out_bits, final_exponent, final_mantissa, shift, inexact, grs_count;
+static inline fp5x10 unsigned_add_bit(fp5x10 exponent, fp8x23 mantissa, fp5x10 b, fp5x10 *grs) {
+ fp5x10 b_bits, out_bits, final_exponent, final_mantissa, shift, inexact, grs_count;
  b_bits = b;
 	
 	int16_t a_exponent = ((int16_t)exponent) - 15;
  int16_t b_exponent = (int16_t)(b_bits >> 10) - 15;
  
- uint32_t a_mantissa = mantissa;
- uint32_t b_mantissa = (b_bits & 0x03FF);
+ fp8x23 a_mantissa = mantissa;
+ fp8x23 b_mantissa = (b_bits & 0x03FF);
 
  // add leading ones if not subnormal
  if(b_exponent >= -14)
@@ -241,13 +245,13 @@ static inline uint16_t unsigned_add_bit(uint16_t exponent, uint32_t mantissa, ui
  if(a_exponent > b_exponent) {
   shift = (a_exponent - b_exponent);
   inexact |= (b_mantissa & ((1 << (shift+1)) - 1)) != 0;
-  (*grs) = (uint16_t)((b_mantissa >> (shift-3)) & 0x00000007);
+  (*grs) = (fp5x10)((b_mantissa >> (shift-3)) & 0x00000007);
   b_mantissa >>= shift;
   final_exponent = a_exponent;
  } else if (a_exponent < b_exponent) {
   shift = (b_exponent - a_exponent);
   inexact |= (a_mantissa & ((1 << (shift+1)) - 1)) != 0;
-  (*grs) = (uint16_t)((a_mantissa >> (shift-3)) & 0x00000007);
+  (*grs) = (fp5x10)((a_mantissa >> (shift-3)) & 0x00000007);
   a_mantissa >>= shift;
   final_exponent = b_exponent;
  } else {
@@ -283,16 +287,16 @@ static inline uint16_t unsigned_add_bit(uint16_t exponent, uint32_t mantissa, ui
 /*
  no sign subtraction
 */
-static inline uint16_t unsigned_sub_bit_a(uint16_t exponent, uint32_t mantissa, uint16_t b, uint16_t *grs) {
- uint16_t b_bits, out_bits, shift, inexact;
+static inline fp5x10 unsigned_sub_bit_a(fp5x10 exponent, fp8x23 mantissa, fp5x10 b, fp5x10 *grs) {
+ fp5x10 b_bits, out_bits, shift, inexact;
  int16_t final_mantissa, final_exponent;
 	b_bits = b;
 
 	int16_t a_exponent = ((int16_t)(exponent)) - 15;
 	int16_t b_exponent = (int16_t)(b_bits >> 10) - 15;
 
- uint32_t a_mantissa = mantissa;
- uint32_t b_mantissa = (b_bits & 0x03FF);
+ fp8x23 a_mantissa = mantissa;
+ fp8x23 b_mantissa = (b_bits & 0x03FF);
 
   // add leading ones if not subnormal
  if(b_exponent >= -14)
@@ -303,13 +307,13 @@ static inline uint16_t unsigned_sub_bit_a(uint16_t exponent, uint32_t mantissa, 
  if(a_exponent > b_exponent) {
   shift = (a_exponent - b_exponent);
   inexact |= (b_mantissa & ((1 << (shift+1)) - 1)) != 0;
-  (*grs) = (uint16_t)((b_mantissa >> (shift-3)) & 0x00000007);
+  (*grs) = (fp5x10)((b_mantissa >> (shift-3)) & 0x00000007);
   b_mantissa >>= shift;
   final_exponent = a_exponent;
  } else {
   shift = (b_exponent - a_exponent);
   inexact |= (a_mantissa & ((1 << (shift+1)) - 1)) != 0;
-  (*grs) = (uint16_t)((a_mantissa >> (shift-3)) & 0x00000007);
+  (*grs) = (fp5x10)((a_mantissa >> (shift-3)) & 0x00000007);
   a_mantissa >>= shift;
   final_exponent = b_exponent;
  }
@@ -335,16 +339,16 @@ static inline uint16_t unsigned_sub_bit_a(uint16_t exponent, uint32_t mantissa, 
 /*
  no sign subtraction
 */
-static inline uint16_t unsigned_sub_bit_b(uint16_t a, uint16_t exponent, uint32_t mantissa, uint16_t *grs) {
- uint16_t a_bits, out_bits, shift, inexact;
+static inline fp5x10 unsigned_sub_bit_b(fp5x10 a, fp5x10 exponent, fp8x23 mantissa, fp5x10 *grs) {
+ fp5x10 a_bits, out_bits, shift, inexact;
  int16_t final_mantissa, final_exponent;
 	a_bits = a;
 
 	int16_t a_exponent = (int16_t)(a_bits >> 10) - 15;
 	int16_t b_exponent = ((int16_t)(exponent)) - 15;
 
- uint32_t a_mantissa = (a_bits & 0x03FF);
- uint32_t b_mantissa = mantissa;
+ fp8x23 a_mantissa = (a_bits & 0x03FF);
+ fp8x23 b_mantissa = mantissa;
 
   // add leading ones if not subnormal
  if(a_exponent >= -14)
@@ -355,13 +359,13 @@ static inline uint16_t unsigned_sub_bit_b(uint16_t a, uint16_t exponent, uint32_
  if(a_exponent > b_exponent) {
   shift = (a_exponent - b_exponent);
   inexact |= (b_mantissa & ((1 << (shift+1)) - 1)) != 0;
-  (*grs) = (uint16_t)((b_mantissa >> (shift-3)) & 0x00000007);
+  (*grs) = (fp5x10)((b_mantissa >> (shift-3)) & 0x00000007);
   b_mantissa >>= shift;
   final_exponent = a_exponent;
  } else {
   shift = (b_exponent - a_exponent);
   inexact |= (a_mantissa & ((1 << (shift+1)) - 1)) != 0;
-  (*grs) = (uint16_t)((a_mantissa >> (shift-3)) & 0x00000007);
+  (*grs) = (fp5x10)((a_mantissa >> (shift-3)) & 0x00000007);
   a_mantissa >>= shift;
   final_exponent = b_exponent;
  }
@@ -388,15 +392,18 @@ static inline uint16_t unsigned_sub_bit_b(uint16_t a, uint16_t exponent, uint32_
 /*
  addition with full precision and sign correction
 */
-static inline uint16_t add(uint16_t sign, uint16_t exponent, uint32_t mantissa, uint16_t product, uint16_t b, uint16_t *grs) {
- uint16_t a_sign = sign;
- uint16_t b_sign = b & 0x8000;
+static inline fp5x10 add(fp5x10 sign, fp5x10 exponent, fp8x23 mantissa, fp5x10 product, fp5x10 b, fp5x10 *grs) {
+ fp5x10 a_sign = sign;
+ fp5x10 b_sign = b & 0x8000;
 
  b &= 0x7FFF;
  product &= 0x7FFF;
- //inf nan
+ //inf, nan
  if(b >= 0x7C00) {
-  return 0x7C01;
+  if(b == 0x7C00)
+   return 0x7C00;
+  else
+   return 0x7C01;
  }
   
  if(a_sign == b_sign) {
@@ -413,10 +420,10 @@ static inline uint16_t add(uint16_t sign, uint16_t exponent, uint32_t mantissa, 
 
 
 
-uint16_t fp16_fma(uint16_t x, uint16_t y, uint16_t z) {
+fp5x10 fp16_fma(fp5x10 x, fp5x10 y, fp5x10 z) {
 
- uint16_t sign, exponent, product, grs, sum;
- uint32_t mantissa;
+ fp5x10 sign, exponent, product, grs, sum;
+ fp8x23 mantissa;
  
  if(z == 0) {
  	return fp16_mul(x, y);
@@ -436,17 +443,20 @@ uint16_t fp16_fma(uint16_t x, uint16_t y, uint16_t z) {
  	case RETURN_INF:
  	 return 0x7C00;
  	break;
+ 	case RETURN_NAN:
+ 	 return 0x7C01;
+ 	break;
  	default:
  	 sum = add(sign, exponent, mantissa, product, z, &grs);
   break;
  }
  
  //https://stackoverflow.com/questions/79108779/why-do-we-need-both-a-round-bit-and-a-sticky-bit-in-ieee-754-floating-point-impl
- uint16_t guard = (grs >> 2) & 1;
- uint16_t round = (grs >> 1) & 1;
- uint16_t sticky = grs & 1;
+ fp5x10 guard = (grs >> 2) & 1;
+ fp5x10 round = (grs >> 1) & 1;
+ fp5x10 sticky = grs & 1;
 
- uint16_t out_mantissa = (sum & 0x03FF);
+ fp5x10 out_mantissa = (sum & 0x03FF);
  
  sign = sum & 0x8000;
  exponent = (sum & 0x7FFF) >> 10;
@@ -455,7 +465,7 @@ uint16_t fp16_fma(uint16_t x, uint16_t y, uint16_t z) {
  if(exponent > 0)
   out_mantissa |= (1 << 10);
  
- uint16_t increment = 0;
+ fp5x10 increment = 0;
 
  //inexact rounding
  switch(fegetround()) {

@@ -5,7 +5,7 @@
 /*
  3 degree polynomial sine
 */
-static const uint32_t c[8] = {
+static const fp8x23 c[8] = {
 	0x3633BA63,
 	0xB94FF8AA,
 	0x3C08886F,
@@ -20,11 +20,11 @@ static const uint32_t c[8] = {
 /*
  tan(x) = sin(x)/cos(x)
 */
-uint16_t fp16_tan(uint16_t x) {
-	uint32_t mx, q, x2, x3, poly, sign, _sin, _cos;
+fp5x10 fp16_tan(fp5x10 x) {
+	fp8x23 mx, q, x2, x3, poly, sign, _sin, _cos;
 	
 	//sign handle
-	sign = (uint32_t)(x & 0x8000) << 16;
+	sign = (fp8x23)(x & 0x8000) << 16;
 	x &= 0x7FFF;
 	
 	if(x >= 0x7C00) //inf, nan
@@ -32,7 +32,7 @@ uint16_t fp16_tan(uint16_t x) {
 	
  mx =    __fp32_tofloat32(x);
 	mx =    fp32_sub(mx, fp32_mul(fp32_trunc(fp32_mul(c[4], mx)), c[5]));
- q =     (uint32_t)fp32_floattolong(fp32_mul(mx, c[6]));
+ q =     (fp8x23)fp32_floattolong(fp32_mul(mx, c[6]));
 	mx =    fp32_sub(mx, fp32_mul(c[7], fp32_longtofloat32((int64_t)q) ));
 	sign ^= (q == 2 || q == 3) << 31;
 	mx =    (q == 1 || q == 3) ? fp32_sub(c[7], mx) : mx;
@@ -43,7 +43,7 @@ uint16_t fp16_tan(uint16_t x) {
 
  mx =    __fp32_tofloat32(x);
 	mx =    fp32_sub(mx, fp32_mul(fp32_trunc(fp32_mul(c[4], mx)), c[5]));
- q =     (uint32_t)fp32_floattolong(fp32_mul(mx, c[6]));
+ q =     (fp8x23)fp32_floattolong(fp32_mul(mx, c[6]));
 	mx =    fp32_sub(mx, fp32_mul(c[7], fp32_longtofloat32((int64_t)q) ));
 	sign    = (q == 1 || q == 2) << 31;
 	mx =    (q == 0 || q == 2) ? fp32_sub(c[7], mx) : mx;
@@ -52,6 +52,7 @@ uint16_t fp16_tan(uint16_t x) {
  poly =  fp32_add(fp32_mul(fp32_add(fp32_mul(fp32_add(fp32_mul(c[0], x2), c[1]), x2), c[2]), x2), c[3]);
 	_cos =  fp32_add(mx, fp32_mul(x3, poly)) | sign;
 
+ //divide before rounding into float16
  return __fp32_tofloat16(fp32_div(_sin, _cos));
 }
 

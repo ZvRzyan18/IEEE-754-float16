@@ -5,7 +5,7 @@
 /*
  get the exponent of x and return it as a signed integer
 */
-int fp16_ilogb(uint16_t x) {
+int fp16_ilogb(fp5x10 x) {
 	return ((int)x >> 10) - 15;
 }
 
