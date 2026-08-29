@@ -15,149 +15,154 @@
 
 
 static inline fp8x23 __fp32_tofloat32(fp5x10 x) {
- fp8x23 sign = x >> 15;
- fp8x23 exp16 = (x & 0x7FFF) >> 10;
- fp8x23 mant16 = x & 0x03FF;
+ fp8x23 sign = (uint32_t)(x & 0x8000) << 16;
+ fp8x23 exponent  = (x >> 10) & 0x1F;
+ fp8x23 mantissa = x & 0x03FF;
 
- fp8x23 sign32 = sign << 31;
- fp8x23 exp32, mant32;
-
- if(exp16 == 0) {
-  if(mant16 == 0) {
-   return 0;
-  } else {
-   // subnormal
-   int shift = 0;
-   fp8x23 mant = mant16;
-   while((mant & 0x400) == 0) {
-    mant <<= 1;
-    shift++;
-   }
-   mant &= 0x03FF;
-   exp32 = -14 - shift + 127;
-   mant32 = mant << 13;
+ if(exponent == 0) {
+  if(mantissa == 0) {
+   return sign; //preserve sign
   }
- } else if(exp16 == 0x1F) {
-  //inf, nan
-  exp32 = 0xFF;
-  mant32 = mant16 ? (mant16 << 13) | 1 : 0;
- } else {
-  exp32 = exp16 - 15 + 127;
-  mant32 = mant16 << 13;
+  //subnormal
+  int shift = 0;
+  while((mantissa & 0x0400) == 0) {
+   mantissa <<= 1;
+   shift++;
+  }
+  mantissa &= 0x03FF;
+  int out_exponent = (uint32_t)(127 - 14 - shift);
+  fp8x23 out_mantissa = mantissa << 13;
+  return sign | (out_exponent << 23) | out_mantissa;
  }
- 
- //no need rounding since no bits lost
- return sign32 | (exp32 << 23) | (mant32 & 0x007FFFFF);
+ if(exponent == 0x1F) {
+  fp8x23 out_mantissa = mantissa << 13;
+  return sign | (0xFF << 23) | out_mantissa;
+ }
+ int out_exponent = exponent - 15 + 127;
+ fp8x23 out_mantissa = mantissa << 13;
+ return sign | (out_exponent << 23) | out_mantissa;
 }
 
 
 static inline fp5x10 __fp32_tofloat16(fp8x23 x) {
- fp8x23 bits = x;
- fp8x23 sign = bits >> 31;
- int32_t exp32 = (bits & 0x7FFFFFFF) >> 23;
- fp8x23 mant32 = bits & 0x007FFFFF;
- 
- fp5x10 grs = 0;
- fp5x10 inexact = 0;
-
- fp5x10 sign16 = sign << 15;
- fp5x10 exp16 = 0;
- fp5x10 mant16 = 0;
- 
- if((x & 0x7FFFFFFF) == 0)
-  return 0;
-
- if(exp32 == 0xFF) {
-  //inf, nan
-  exp16 = 0x1F;
-  mant16 = mant32 ? 1 : 0;
- } else if(exp32 > 142) {
-  //overflow
-  feraiseexcept(FE_OVERFLOW);
-  return 0x7C00;
- } else if(exp32 < 113) {
-  if(exp32 < 103) {
-   // too small for subnormal, round to zero
-   feraiseexcept(FE_UNDERFLOW);
-   return 0;
-  } else {
-   //subnormal
-   fp8x23 mant = mant32 | 0x800000;
-   int32_t shift = 113 - exp32;
-   mant16 = mant >> (shift + 13);
-   inexact |= (fp5x10)(mant & ((1 << (shift + 14))-1)) != 0;
-   grs = (fp5x10)((mant >> (shift + 10)) & 0x00000007);
-  }
- } else {
-  exp16 = exp32 - 127 + 15;
-  mant16 = mant32 >> 13;
-  inexact |= (fp5x10)(mant32 & ((1 << 14)-1)) != 0;
-  grs = (fp5x10)((mant32 >> 10) & 0x00000007);
+ fp5x10 sign = (uint16_t)((x >> 16) & 0x8000);
+ fp8x23 exp  = (x >> 23) & 0xFF;
+ fp8x23 frac = x & 0x7FFFFF;
+ if(exp == 0xFF) {
+  if(frac == 0)
+   return sign | 0x7C00;
+  //non-zero mantissa will result in NAN
+  return sign | 0x7C00 | (frac >> 13);
  }
- 
- if(inexact)
- 	feraiseexcept(FE_INEXACT);
- else
- 	return sign16 | (exp16 << 10) | mant16; //exact, no need rounding
- 
- /*
-  inexact rounding
- */
-  fp5x10 guard = (grs >> 2) & 1;
-  fp5x10 round = (grs >> 1) & 1;
-  fp5x10 sticky = grs & 1;
+ if(exp == 0) {
+  if (frac != 0)
+   feraiseexcept(FE_UNDERFLOW | FE_INEXACT);
+   return sign;
+  }
+ if(exp >= 143) {
+  //round infinity
+  feraiseexcept(FE_OVERFLOW | FE_INEXACT);
+  switch (fegetround()) {
+   case FE_TOWARDZERO:
+    return sign | 0x7BFF;
+   case FE_UPWARD:
+    return sign ? (sign | 0x7BFF) : 0x7C00;
+   case FE_DOWNWARD:
+    return sign ? 0xfC00 : 0x7BFF;
+   case FE_TONEAREST:
+    return sign | 0x7C00;
+   default:
+    return sign | 0x7C00;
+   }
+  }
+ fp8x23 sig = frac | 0x800000;
 
-  fp5x10 out_mantissa = mant16;
-  
-  //only add leading one for non subnormal
-  if(exp16 > 0)
-   out_mantissa |= (1 << 10);
-  
-  fp5x10 increment = 0;
+ // exponent >= 113 : normal
+ // exponent < 113 subnormal
+ if(exp >= 113) {
+  uint16_t h_exp = (uint16_t)(exp - 112);
+  fp8x23 h_frac = sig >> 13;
+  fp8x23 inexact = sig & 0x1fff;
+  if(inexact)
+   feraiseexcept(FE_INEXACT);
+  fp8x23 guard  = (inexact >> 12) & 1;
+  fp8x23 round  = (inexact >> 11) & 1;
+  fp8x23 sticky = inexact & 0x7ff;
 
+  fp8x23 increment = 0;
   switch(fegetround()) {
    case FE_TONEAREST:
-   if(guard && (round || sticky || (out_mantissa & 1)))
-    increment = 1;
+    increment = guard && (round || sticky || (h_frac & 1));
    break;
    case FE_TOWARDZERO:
-    increment = 0;
    break;
    case FE_UPWARD:
-    if(sign) 
-     increment = 0;
-    else 
-     increment = guard || round || sticky;
+    increment = !sign && inexact != 0;
    break;
    case FE_DOWNWARD:
-    if(sign)
-     increment = 1;
-    else 
-     increment = 0;
+    increment = sign && inexact != 0;
    break;
-   default: //to nearest, default
-    if(guard && (round || sticky || (out_mantissa & 1)))
-     increment = 1;
+   default:
+    increment = guard && (round || sticky || (h_frac & 1));
    break;
   }
 
- if(increment) {
-  out_mantissa++;
-  //overflow mantissa, adjust exponent and re-normalize
-  if(out_mantissa >= (1 << 11)) {
-   out_mantissa >>= 1;
-   exp16++;
-   
-   //too large, overflow exponent
-   if(exp16 > 30) {
-   	feraiseexcept(FE_OVERFLOW);
-    return 0x7C00;
+  if(increment) {
+   h_frac++;
+   if(h_frac == 0x400) {
+    h_frac = 0;
+    h_exp++;
+    if(h_exp == 31) {
+     feraiseexcept(FE_OVERFLOW);
+     return sign | 0x7C00;
+    }
    }
-   
+  }
+  return sign | (h_exp << 10) | (h_frac & 0x3ff);
+ }
+ //2^-14 is zero exponent = subnormal
+ //since there is 10 mantissa, the subnormal
+ //can reach up to 2^-24
+ fp8x23 shift = 126 - exp;
+
+ fp8x23 h_frac = 0;
+ fp8x23 inexact;
+
+ if(shift < 32) {
+  h_frac = sig >> shift;
+  inexact = sig & ((1u << shift) - 1);
+ } else {
+  inexact = sig;
+ }
+
+ if(inexact)
+  feraiseexcept(FE_INEXACT);
+ uint32_t increment = 0;
+ if(inexact) {
+  fp8x23 halfway = 1u << (shift - 1);
+  switch (fegetround()) {
+  case FE_TONEAREST:
+   increment = (inexact > halfway) || (inexact == halfway && (h_frac & 1));
+  break;
+  case FE_TOWARDZERO:
+  break;
+  case FE_UPWARD:
+   increment = !sign;
+  break;
+  case FE_DOWNWARD:
+   increment = sign;
+  break;
+  default:
+   increment = (inexact > halfway) || (inexact == halfway && (h_frac & 1));
+  break;
   }
  }
- mant16 = out_mantissa & 0x03FF;
- return sign16 | (exp16 << 10) | mant16;
+ if(increment) {
+  h_frac++;
+  if(h_frac == 0x400)
+   return sign | 0x0400;
+  }
+ return sign | (fp5x10)h_frac;
 }
 
 
@@ -212,6 +217,7 @@ static inline fp8x23 __unsigned_add_bit(fp8x23 a, fp8x23 b) {
  out_bits |= ((final_exponent + 127) << 23) | (final_mantissa & 0x007FFFFF);
  return out_bits;
 }
+
 
 
 
